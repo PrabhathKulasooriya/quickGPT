@@ -1,22 +1,50 @@
 import {useEffect, useState, useRef} from 'react'
 import { useAppContext } from '../context/AppContext'
 import { assets } from '../assets/assets';
+import toast from 'react-hot-toast';
 import Message from './Message';
 
 const ChatBox = () => {
 
   const containerRef = useRef(null);
   
-  const {selectedChat,theme} = useAppContext();
+  const {selectedChat,theme, user, token, axios, setUser} = useAppContext();
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
 
   const [prompt, setPrompt] = useState("");
-  const [mode, setMode] = useState("");
+  const [mode, setMode] = useState("text");
   const [isPublished, setIsPublished] = useState(false);
+  const chatId= selectedChat?._id;
 
   const onSubmit = async (e)=>{
-      e.preventDefault();
+      try{
+        e.preventDefault();
+         if(!user)return toast.error("Login to send message");
+         setLoading(true);
+         const promptCopy = prompt;
+         setPrompt("");
+         setMessages(prev => [...prev, {role:"user",content:prompt,timestamp:Date.now(), isImage:false}]);
+
+         const {data} = await axios.post(`/api/message/${mode}`,{chatId, prompt, isPublished},{headers:{authorization:token}});
+          if(data.success){
+            setMessages(prev => [...prev, data.reply]);
+            //deduct credits
+            if(mode==='image'){
+              setUser(prev => ({...prev, credits: prev.credits-2}));
+            }else{
+              setUser(prev => ({...prev, credits: prev.credits-1}));
+            }
+          }else{
+            toast.error(data.message);
+            setPrompt(promptCopy);
+          }
+      }catch(error){
+        toast.error(error.response?.data?.message || error.message);
+      }finally{
+        setPrompt("");
+        setLoading(false);
+      }
   }
 
   useEffect(()=>{
